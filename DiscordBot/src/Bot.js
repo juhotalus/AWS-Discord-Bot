@@ -61,6 +61,9 @@ function startStop(isStart, msg, args) {
     aws.command(cmd)
       .then(function (data) {
         console.warn('data = ', data);
+        if (isStart) {
+          checkForStatusInterval = setInterval(checkForStatus, 2500, msg, args.commandArg);
+        }
         return msg.channel.createMessage(`<@${msg.author.id}> ${word} the ${args.commandArg} server`);
       })
       .catch(function (e) {
@@ -108,6 +111,39 @@ Last Startup: ${reservation.Instances[0].LaunchTime}`
     return msg.channel.createMessage(err);
   }
 };
+
+var checkForStatusInterval;
+checkForStatus = (msg, instance) => {
+  try {
+    aws.command(`${StatusCommand} --instance-id ${INSTANCES[instance]}`)
+      .then(function (data) {
+        if (data.object.Reservations[0].Instances[0].State.Name === 'running') {
+          clearInterval(checkForStatusInterval);
+          return msg.channel.createMessage('```' + `
+${data.object.Reservations[0].Instances[0].Tags[0].Value.toUpperCase()}
+State:        ${data.object.Reservations[0].Instances[0].State.Name}
+IP Address:   ${data.object.Reservations[0].Instances[0].PublicIpAddress}
+Last Startup: ${data.object.Reservations[0].Instances[0].LaunchTime}`
+              + '```')
+        } else {
+          return false;
+        }
+      })
+      .catch(function (e) {
+        if (verboseLog) {
+          msg.channel.createMessage(`<@${msg.author.id}> Error getting status,  ${e}`);
+        } else {
+          msg.channel.createMessage(`<@${msg.author.id}> Error getting status`);
+        }
+        console.warn(e);
+      });
+
+  } catch (err) {
+    console.warn(err);
+    msg.channel.createMessage(`<@${msg.author.id}> Error getting status`);
+    return msg.channel.createMessage(err);
+  }
+}
 
 // Every time a message is sent anywhere the bot is present,
 // this event will fire and we will check if the bot was mentioned.
