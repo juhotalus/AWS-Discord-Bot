@@ -83,7 +83,14 @@ commandHandlerForCommandName['status'] = (msg, args) => {
     aws.command(StatusCommand + (args.commandArg ? ` --instance-id ${INSTANCES[args.commandArg]}` : ''))
       .then(function (data) {
         data.object.Reservations.forEach(reservation => {
-          return msg.channel.createMessage(`*Status: \n **Name**: ${reservation.Instances[0].Tags[0].Value} \n **State**: ${reservation.Instances[0].State.Name} \n **IP Address**: ${reservation.Instances[0].PublicIpAddress} \n **Last Startup**: ${reservation.Instances[0].LaunchTime}*`);
+          if (reservation.Instances[0].State.Name !== 'stopped') {
+            return msg.channel.createMessage('```' + `
+${reservation.Instances[0].Tags[0].Value.toUpperCase()}
+State:        ${reservation.Instances[0].State.Name}
+IP Address:   ${reservation.Instances[0].PublicIpAddress}
+Last Startup: ${reservation.Instances[0].LaunchTime}`
+              + '```');
+          }
         });
       })
       .catch(function (e) {
