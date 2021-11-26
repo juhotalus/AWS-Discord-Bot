@@ -5,12 +5,12 @@ var Aws = awsCli.Aws;
 const { ACCESSKEY } = require('../config.json');
 const { SECRETKEY } = require('../config.json');
 const { SESSIONTOKEN } = require('../config.json');
-const { INSTANCE } = require('../config.json');
+const { INSTANCES } = require('../config.json');
 const { MESSAGELOGGING } = require('../config.json');
 var verboseLog = (MESSAGELOGGING === 'T');
-const StartCommand = 'ec2 start-instances --instance-ids ' + INSTANCE;
-const StopCommand = 'ec2 stop-instances --instance-ids ' + INSTANCE;
-const StatusCommand = 'ec2 describe-instances --instance-id ' + INSTANCE;
+const StartCommand = 'ec2 start-instances --instance-ids ';
+const StopCommand = 'ec2 stop-instances --instance-ids ';
+const StatusCommand = 'ec2 describe-instances --instance-id ';
 
 let options = new Options(
   /* accessKey    */ ACCESSKEY,
@@ -26,7 +26,7 @@ const { BOT_TOKEN } = require('../config.json');
 const { ROLEID } = require('../config.json');
 const { CHANNELID } = require('../config.json');
 
-const PREFIX = '$aws';
+const PREFIX = '!aws';
 const HelpDocs =
     '\n Help Docs: \n `start`: Starts the server \n `stop`: Stops the server \n `status`: Returns the server status  ';
 
@@ -41,46 +41,46 @@ bot.on('ready', () => {
 
 const commandHandlerForCommandName = {};
 commandHandlerForCommandName['start'] = (msg, args) => {
-    startStop(true, msg);
+    startStop(true, msg, args);
 };
 
 commandHandlerForCommandName['stop'] = (msg, args) => {
-    startStop(false, msg);
+    startStop(false, msg, args);
 };
 
 commandHandlerForCommandName['help'] = (msg, args) => {
     return msg.channel.createMessage(HelpDocs);
 };
 
-function startStop(isStart, msg){
+function startStop(isStart, msg, args){
 	var cmd = isStart ? StartCommand : StopCommand;
+        cmd = cmd + INSTANCES[args.commandArg];
 	var word = isStart ? 'Starting' : 'Stopping';
 	console.warn(`${word} the server`);
 	try {
         aws.command(cmd)
             .then(function (data) {
                 console.warn('data = ', data);
-                return msg.channel.createMessage(`<@${msg.author.id}> ${word} the server`);
+                return msg.channel.createMessage(`<@${msg.author.id}> ${word} the ${args.commandArg} server`);
             })
             .catch(function (e) {
                 if (verboseLog) {
-                    msg.channel.createMessage(`<@${msg.author.id}> Error ${word} the server,  ${e}`);
+                    msg.channel.createMessage(`<@${msg.author.id}> Error ${word} the ${args.commandArg} server,  ${e}`);
                 } else {
-                    msg.channel.createMessage(`<@${msg.author.id}> Error ${word} the server`);
+                    msg.channel.createMessage(`<@${msg.author.id}> Error ${word} the ${args.commandArg} server`);
                 }
             });
 
     } catch (err) {
-        msg.channel.createMessage(`<@${msg.author.id}> Error ${word} the server`);
+        msg.channel.createMessage(`<@${msg.author.id}> Error ${word} the ${args.commandArg} server`);
         return msg.channel.createMessage(err);
     }
 }
-	
 
 commandHandlerForCommandName['status'] = (msg, args) => {
     console.warn("Getting server status");
     try {
-        aws.command(StatusCommand)
+        aws.command(StatusCommand + INSTANCES[args.commandArg])
             .then(function (data) {
 		var reply = data.object.Reservations[0].Instances[0];
                 return msg.channel.createMessage(`<@${msg.author.id}> *Status: \n **Name**: ${reply.Tags[0].Value} \n **State**: ${reply.State.Name} \n **IP Address**: ${reply.PublicIpAddress} \n **Last Startup**: ${reply.LaunchTime}*`);
@@ -140,7 +140,9 @@ bot.on('messageCreate', async (msg) => {
         return;
     }
     // Extract the parts of the command and the command name
-    const commandName = content.split(PREFIX)[1].trim();
+    const command = content.split(PREFIX)[1].trim().split(' ');
+    const commandName = command[0] ? command[0].trim() : undefined;
+    const commandArg = command[1] ? command[1].trim() : undefined;
 
     // Get the appropriate handler for the command, if there is one.
     const commandHandler = commandHandlerForCommandName[commandName];
@@ -149,11 +151,21 @@ bot.on('messageCreate', async (msg) => {
         return;
     }
 
+    if (!commandArg) {
+        await msg.channel.createMessage('Please specify the instance as an argument.');
+        return;
+    }
+
+    if (!INSTANCES[commandArg]) {
+        await msg.channel.createMessage('Unknown instance.');
+        return;
+    }
+
     // Separate the command arguments from the command prefix and command name.
 
     try {
         // Execute the command.
-        await commandHandler(msg, commandName);
+        await commandHandler(msg, { commandName, commandArg });
     } catch (err) {
         console.warn('Error handling command');
         console.warn(err);
