@@ -10,7 +10,7 @@ const { MESSAGELOGGING } = require('../config.json');
 var verboseLog = (MESSAGELOGGING === 'T');
 const StartCommand = 'ec2 start-instances --instance-ids ';
 const StopCommand = 'ec2 stop-instances --instance-ids ';
-const StatusCommand = 'ec2 describe-instances --instance-id ';
+const StatusCommand = 'ec2 describe-instances';
 
 let options = new Options(
   /* accessKey    */ ACCESSKEY,
@@ -80,10 +80,10 @@ function startStop(isStart, msg, args) {
 commandHandlerForCommandName['status'] = (msg, args) => {
   console.warn("Getting server status");
   try {
-    aws.command(StatusCommand + args.commandArg ? INSTANCES[args.commandArg] : null)
+    aws.command(StatusCommand + (args.commandArg ? ` --instance-id ${INSTANCES[args.commandArg]}` : ''))
       .then(function (data) {
-        data.object.Reservations[0].Instances.forEach(instance => {
-          return msg.channel.createMessage(`*Status: \n **Name**: ${instance.Tags[0].Value} \n **State**: ${instance.State.Name} \n **IP Address**: ${instance.PublicIpAddress} \n **Last Startup**: ${instance.LaunchTime}*`);
+        data.object.Reservations.forEach(reservation => {
+          return msg.channel.createMessage(`*Status: \n **Name**: ${reservation.Instances[0].Tags[0].Value} \n **State**: ${reservation.Instances[0].State.Name} \n **IP Address**: ${reservation.Instances[0].PublicIpAddress} \n **Last Startup**: ${reservation.Instances[0].LaunchTime}*`);
         });
       })
       .catch(function (e) {
